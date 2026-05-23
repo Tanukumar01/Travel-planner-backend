@@ -52,6 +52,14 @@ const bookingSchema = new mongoose_1.Schema({
         type: String,
         required: true,
     },
+    cloudinaryPublicId: {
+        type: String,
+        default: "",
+    },
+    cloudinaryResourceType: {
+        type: String,
+        default: "",
+    },
     status: {
         type: String,
         enum: ["generated", "failed"],

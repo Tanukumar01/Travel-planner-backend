@@ -15,19 +15,38 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
-const path_1 = __importDefault(require("path"));
 const db_1 = __importDefault(require("./config/db"));
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const bookingRoutes_1 = __importDefault(require("./routes/bookingRoutes"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = Number(process.env.PORT || 5001);
+const allowedOrigins = process.env.CLIENT_URL
+    ? process.env.CLIENT_URL.split(",").map((o) => o.trim().replace(/\/$/, ""))
+    : [];
 app.use((0, cors_1.default)({
-    origin: process.env.CLIENT_URL || true,
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, etc.)
+        if (!origin) {
+            return callback(null, true);
+        }
+        const isExplicitlyAllowed = allowedOrigins.includes(origin);
+        const isVercelPreview = origin.endsWith(".vercel.app");
+        const isLocal = origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
+        if (isExplicitlyAllowed || isVercelPreview || isLocal) {
+            callback(null, true);
+        }
+        else {
+            callback(null, false);
+        }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+    optionsSuccessStatus: 200,
 }));
 app.use(express_1.default.json({ limit: "2mb" }));
 app.use(express_1.default.urlencoded({ extended: true }));
-app.use("/uploads", express_1.default.static(path_1.default.join(process.cwd(), "uploads")));
 app.use("/api/auth", authRoutes_1.default);
 app.use("/api/bookings", bookingRoutes_1.default);
 app.get("/api/health", (_req, res) => {
@@ -39,16 +58,25 @@ app.get("/api/health", (_req, res) => {
 app.get("/", (_req, res) => {
     res.send("Travel itinerary server is running");
 });
+// For Vercel Serverless environment, we initialize the database connection
+// but do not run app.listen().
+// In local development, we run both.
 const startServer = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
         yield (0, db_1.default)();
-        app.listen(PORT, () => {
-            console.log(`Server is running on port ${PORT}`);
-        });
+        // Only start listening if not running on Vercel serverless environment
+        if (!process.env.VERCEL) {
+            app.listen(PORT, () => {
+                console.log(`Server is running on port ${PORT}`);
+            });
+        }
     }
     catch (error) {
         console.error("Server startup failed", error);
-        process.exit(1);
+        if (!process.env.VERCEL) {
+            process.exit(1);
+        }
     }
 });
 void startServer();
+exports.default = app;

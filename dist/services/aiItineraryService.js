@@ -13,7 +13,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.processTravelDocument = void 0;
-const promises_1 = __importDefault(require("fs/promises"));
 const path_1 = __importDefault(require("path"));
 const crypto_1 = __importDefault(require("crypto"));
 const pdf_parse_1 = require("pdf-parse");
@@ -188,9 +187,9 @@ const tryParseJson = (value) => {
         }
     }
 };
-const readPdfText = (filePath) => __awaiter(void 0, void 0, void 0, function* () {
+const readPdfText = (fileBuffer) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    const buffer = yield promises_1.default.readFile(filePath);
+    const buffer = fileBuffer;
     const parser = new pdf_parse_1.PDFParse({ data: buffer });
     const parsed = yield parser.getText();
     if ("destroy" in parser && typeof parser.destroy === "function") {
@@ -198,13 +197,13 @@ const readPdfText = (filePath) => __awaiter(void 0, void 0, void 0, function* ()
     }
     return (_a = parsed.text) !== null && _a !== void 0 ? _a : "";
 });
-const callOpenAiForImageExtraction = (filePath, fileType, originalName) => __awaiter(void 0, void 0, void 0, function* () {
+const callOpenAiForImageExtraction = (fileBuffer, fileType, originalName) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e, _f;
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey || !fileType.startsWith("image/")) {
         return null;
     }
-    const base64Image = yield promises_1.default.readFile(filePath, { encoding: "base64" });
+    const base64Image = fileBuffer.toString("base64");
     const response = yield fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -326,13 +325,16 @@ const callOpenAiForItinerary = (extractedData) => __awaiter(void 0, void 0, void
     }
     return normalizeItinerary(parsed, extractedData);
 });
-const processTravelDocument = (_a) => __awaiter(void 0, [_a], void 0, function* ({ filePath, fileType, originalName, }) {
+const processTravelDocument = (_a) => __awaiter(void 0, [_a], void 0, function* ({ fileBuffer, fileType, originalName, }) {
     var _b;
     let extractedText = "";
     if (fileType === "application/pdf") {
-        extractedText = yield readPdfText(filePath);
+        extractedText = yield readPdfText(fileBuffer);
     }
-    const visionExtraction = yield callOpenAiForImageExtraction(filePath, fileType, originalName);
+    else if (fileType === "text/plain") {
+        extractedText = fileBuffer.toString("utf-8");
+    }
+    const visionExtraction = yield callOpenAiForImageExtraction(fileBuffer, fileType, originalName);
     const extractedData = visionExtraction !== null && visionExtraction !== void 0 ? visionExtraction : buildHeuristicExtraction(originalName, extractedText);
     const itinerary = (_b = (yield callOpenAiForItinerary(extractedData))) !== null && _b !== void 0 ? _b : buildFallbackItinerary(extractedData);
     return {

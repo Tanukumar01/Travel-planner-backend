@@ -14,4 +14,5 @@ router.get("/", bookingController_1.getUserItineraries);
 router.get("/:id", bookingController_1.getItineraryById);
 router.post("/upload", uploadMiddleware_1.default.single("document"), bookingController_1.uploadBookingDocument);
 router.post("/:id/share", bookingController_1.createShareLink);
+router.delete("/:id", bookingController_1.deleteItineraryById);
 exports.default = router;

@@ -12,9 +12,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSharedItinerary = exports.createShareLink = exports.getItineraryById = exports.getUserItineraries = exports.uploadBookingDocument = void 0;
+exports.getSharedItinerary = exports.createShareLink = exports.deleteItineraryById = exports.getItineraryById = exports.getUserItineraries = exports.uploadBookingDocument = void 0;
 const Booking_1 = __importDefault(require("../models/Booking"));
 const aiItineraryService_1 = require("../services/aiItineraryService");
+const cloudinaryUploadService_1 = require("../services/cloudinaryUploadService");
 const uploadBookingDocument = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
@@ -32,16 +33,23 @@ const uploadBookingDocument = (req, res) => __awaiter(void 0, void 0, void 0, fu
             });
             return;
         }
+        const cloudinaryFile = yield (0, cloudinaryUploadService_1.uploadBufferToCloudinary)({
+            buffer: req.file.buffer,
+            fileType: req.file.mimetype,
+            originalName: req.file.originalname,
+        });
         const processedDocument = yield (0, aiItineraryService_1.processTravelDocument)({
-            filePath: req.file.path,
+            fileBuffer: req.file.buffer,
             fileType: req.file.mimetype,
             originalName: req.file.originalname,
         });
         const booking = yield Booking_1.default.create({
             userId: req.user.id,
             documentName: req.file.originalname,
-            fileUrl: `/uploads/${req.file.filename}`,
+            fileUrl: cloudinaryFile.secureUrl,
             fileType: req.file.mimetype,
+            cloudinaryPublicId: cloudinaryFile.publicId,
+            cloudinaryResourceType: cloudinaryFile.resourceType,
             status: "generated",
             extractedText: processedDocument.extractedText,
             extractedData: processedDocument.extractedData,
@@ -111,6 +119,42 @@ const getItineraryById = (req, res) => __awaiter(void 0, void 0, void 0, functio
     }
 });
 exports.getItineraryById = getItineraryById;
+const deleteItineraryById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const booking = yield Booking_1.default.findOne({
+            _id: req.params.id,
+            userId: (_a = req.user) === null || _a === void 0 ? void 0 : _a.id,
+        });
+        if (!booking) {
+            res.status(404).json({
+                success: false,
+                message: "Document not found",
+            });
+            return;
+        }
+        yield (0, cloudinaryUploadService_1.deleteCloudinaryAsset)({
+            publicId: booking.cloudinaryPublicId,
+            resourceType: booking.cloudinaryResourceType,
+        });
+        yield booking.deleteOne();
+        res.status(200).json({
+            success: true,
+            message: "Document and itinerary deleted",
+            data: {
+                id: req.params.id,
+            },
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Failed to delete the document",
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+});
+exports.deleteItineraryById = deleteItineraryById;
 const createShareLink = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
