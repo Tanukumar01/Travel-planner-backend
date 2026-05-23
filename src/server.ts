@@ -32,16 +32,28 @@ app.get("/", (_req: Request, res: Response) => {
     res.send("Travel itinerary server is running");
 });
 
+// For Vercel Serverless environment, we initialize the database connection
+// but do not run app.listen().
+// In local development, we run both.
 const startServer = async (): Promise<void> => {
     try {
         await connectDB();
-        app.listen(PORT, () => {
-            console.log(`Server is running on port ${PORT}`);
-        });
+        
+        // Only start listening if not running on Vercel serverless environment
+        if (!process.env.VERCEL) {
+            app.listen(PORT, () => {
+                console.log(`Server is running on port ${PORT}`);
+            });
+        }
     } catch (error) {
         console.error("Server startup failed", error);
-        process.exit(1);
+        if (!process.env.VERCEL) {
+            process.exit(1);
+        }
     }
 };
 
 void startServer();
+
+export default app;
+
