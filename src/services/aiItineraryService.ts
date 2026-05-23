@@ -1,6 +1,6 @@
 import path from "path";
 import crypto from "crypto";
-import { PDFParse } from "pdf-parse";
+
 
 type ExtractedData = {
     documentType: string;
@@ -253,6 +253,8 @@ const tryParseJson = (value: string): Record<string, unknown> | null => {
 
 const readPdfText = async (fileBuffer: Buffer): Promise<string> => {
     const buffer = fileBuffer;
+    // Dynamically import pdf-parse only when needed to prevent Vercel boot-time issues
+    const { PDFParse } = await import("pdf-parse");
     const parser = new PDFParse({ data: buffer });
     const parsed = await parser.getText();
 
