@@ -10,9 +10,32 @@ dotenv.config();
 const app: Application = express();
 const PORT = Number(process.env.PORT || 5001);
 
+const allowedOrigins = process.env.CLIENT_URL
+    ? process.env.CLIENT_URL.split(",").map((o) => o.trim().replace(/\/$/, ""))
+    : [];
+
 app.use(
     cors({
-        origin: process.env.CLIENT_URL || true,
+        origin: (origin, callback) => {
+            // Allow requests with no origin (like mobile apps, curl, etc.)
+            if (!origin) {
+                return callback(null, true);
+            }
+            
+            const isExplicitlyAllowed = allowedOrigins.includes(origin);
+            const isVercelPreview = origin.endsWith(".vercel.app");
+            const isLocal = origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
+            
+            if (isExplicitlyAllowed || isVercelPreview || isLocal) {
+                callback(null, true);
+            } else {
+                callback(null, false);
+            }
+        },
+        credentials: true,
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+        optionsSuccessStatus: 200,
     })
 );
 app.use(express.json({ limit: "2mb" }));
